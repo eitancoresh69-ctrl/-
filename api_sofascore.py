@@ -8,10 +8,11 @@ HEADERS = {
     "Referer": "https://www.sofascore.com/"
 }
 
+# הרשימה המעודכנת בדיוק לפי בקשתך
 TARGET_LEAGUES = [
-    'Premier League', 'LaLiga', 'Ligue 1', 'Serie A',
-    'Ligat HaAl', 'State Cup', 'Toto Cup',
-    'NBA', 'Super League', 'National League'
+    'UEFA Champions League', 'NBA', 'Super League', 'CBA', 
+    'Ligat HaAl', 'LaLiga', 'Copa del Rey', 'Supercopa',
+    'Premier League', 'FA Cup', 'EFL Cup', 'Ligue 1'
 ]
 
 @st.cache_data(ttl=1800)
@@ -36,19 +37,54 @@ def fetch_games_for_dates(sport="soccer", days=5):
                             "time": datetime.fromtimestamp(event.get("startTimestamp", 0)).strftime("%H:%M"),
                             "league": league,
                             "home": event.get("homeTeam", {}).get("name", "Unknown"),
+                            "home_id": event.get("homeTeam", {}).get("id"),
                             "away": event.get("awayTeam", {}).get("name", "Unknown"),
+                            "away_id": event.get("awayTeam", {}).get("id"),
                         })
         except: pass
     
     return {k: v for k, v in games_by_date.items() if v}
 
+def get_form(team_id, is_home=None):
+    """מושכת את כושר הקבוצה (5 אחרונים) וממירה ל-נ/ת/ה"""
+    url = f"https://api.sofascore.com/api/v1/team/{team_id}/events/last/0"
+    form = []
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=5)
+        if res.status_code == 200:
+            events = res.json().get("events", [])
+            
+            # סינון בית/חוץ במידת הצורך
+            if is_home is True:
+                events = [e for e in events if e.get("homeTeam", {}).get("id") == team_id]
+            elif is_home is False:
+                events = [e for e in events if e.get("awayTeam", {}).get("id") == team_id]
+            
+            for e in events[:5]:
+                h_score = e.get("homeScore", {}).get("current", 0)
+                a_score = e.get("awayScore", {}).get("current", 0)
+                is_h = e.get("homeTeam", {}).get("id") == team_id
+                
+                if h_score == a_score:
+                    form.append(("ת", "#4a6070")) # אפור לתיקו
+                elif (is_h and h_score > a_score) or (not is_h and a_score > h_score):
+                    form.append(("נ", "#00ff88")) # ירוק לניצחון
+                else:
+                    form.append(("ה", "#ff3b5c")) # אדום להפסד
+    except: pass
+    return form
+
 @st.cache_data(ttl=1800)
-def get_game_deep_data(game_id, home_name, away_name):
+def get_game_deep_data(game_id, home_id, away_id):
     data = {
-        "odds": {"1": "N/A", "X": "N/A", "2": "N/A"},
-        "h2h": "אין מספיק נתונים היסטוריים.",
-        "missing_players": "אין מידע זמין כרגע על חיסורים.",
-        "stats": "המשחק טרם החל או שאין נתונים חיים זמינים (קרנות/כרטיסים מופיעים רק בזמן אמת)."
+        "odds": {"1": "-", "X": "-", "2": "-"},
+        "h2h_matches": [],
+        "home_form": get_form(home_id),
+        "away_form": get_form(away_id),
+        "home_home_form": get_form(home_id, is_home=True),
+        "away_away_form": get_form(away_id, is_home=False),
+        "missing_players": "אין מידע על חיסורים.",
+        "stats": "המשחק טרם החל או שאין נתונים חיים."
     }
     
     try:
@@ -59,12 +95,14 @@ def get_game_deep_data(game_id, home_name, away_name):
 
     try:
         res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/h2h/events", headers=HEADERS).json()
-        events = res.get("events", [])[:10]
-        if events:
-            h_wins = sum(1 for g in events if g.get("winnerCode") == 1)
-            a_wins = sum(1 for g in events if g.get("winnerCode") == 2)
-            draws = sum(1 for g in events if g.get("winnerCode") == 3)
-            data["h2h"] = f"ב-{len(events)} המפגשים האחרונים: {h_wins} נצחונות לבית, {a_wins} לחוץ, {draws} תיקו."
+        events = res.get("events", [])[:5]
+        for e in events:
+            h_team = e.get("homeTeam", {}).get("name", "")
+            a_team = e.get("awayTeam", {}).get("name", "")
+            h_score = e.get("homeScore", {}).get("current", 0)
+            a_score = e.get("awayScore", {}).get("current", 0)
+            date_str = datetime.fromtimestamp(e.get("startTimestamp", 0)).strftime("%d/%m/%Y")
+            data["h2h_matches"].append(f"📅 {date_str} | {h_team} {h_score} - {a_score} {a_team}")
     except: pass
 
     try:
@@ -77,18 +115,17 @@ def get_game_deep_data(game_id, home_name, away_name):
             data["missing_players"] = " | ".join(missing)
     except: pass
 
-    # נסיון למשוך נתונים חיים (במידה והמשחק התחיל)
     try:
         res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/statistics", headers=HEADERS)
         if res.status_code == 200:
             stats_list = res.json().get("statistics", [])[0].get("groups", [])
-            extracted_stats = []
+            extracted = []
             for group in stats_list:
                 for item in group.get("statisticsItems", []):
                     if item["name"] in ["Corner kicks", "Red cards", "Yellow cards", "Ball possession"]:
-                        extracted_stats.append(f"{item['name']}: {item['home']} - {item['away']}")
-            if extracted_stats:
-                data["stats"] = " | ".join(extracted_stats)
+                        extracted.append(f"{item['name']}: {item['home']} - {item['away']}")
+            if extracted:
+                data["stats"] = " | ".join(extracted)
     except: pass
 
     return data
