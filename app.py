@@ -9,42 +9,32 @@ st.set_page_config(page_title="SportIQ ULTRA v2", layout="wide", initial_sidebar
 if 'ai_results' not in st.session_state: st.session_state.ai_results = {}
 if 'selected_sport' not in st.session_state: st.session_state.selected_sport = "כדורגל ⚽"
 
-# CSS מתקדם לתיקון כל בעיות התצוגה
 st.markdown("""
     <style>
         * { direction: rtl !important; font-family: 'Segoe UI', 'Heebo', sans-serif !important; }
         .stApp { background: linear-gradient(135deg, #02040a 0%, #0a1622 100%) !important; color: #e8f4f8 !important; }
         [data-testid="stSidebar"] { background: linear-gradient(180deg, #0c1220 0%, #131d2d 100%) !important; border-left: 2px solid rgba(0,240,255,0.15) !important; }
-        
-        /* תיקון טקסט כהה בסרגל הצד - הכל יהיה לבן וקריא */
         .stRadio > div[role="radiogroup"] > label > div > div > p { color: #ffffff !important; font-size: 15px !important; font-weight: 500 !important; }
         .stTextInput > div > div > input { color: #ffffff !important; }
-        
         h1, h2, h3, h4 { color: #00f0ff !important; font-weight: 700 !important; }
         p, span, div, label { text-align: right !important; direction: rtl !important; }
-        
-        /* עיצוב כרטיסיות נתונים */
         .metric-card { background: rgba(0, 240, 255, 0.05); padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 240, 255, 0.2); text-align: center; }
         .metric-val { font-size: 1.8rem; font-weight: bold; color: #00ff88; }
         .metric-label { font-size: 0.9rem; color: #a8b2c1; }
-        
         .data-box { background: rgba(17, 25, 39, 0.6); border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 10px; padding: 18px; margin-bottom: 15px; }
         .form-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; font-weight: 900; font-size: 12px; margin: 0 3px; color: #111927; }
     </style>
 """, unsafe_allow_html=True)
 
-# אזור עליון: בחירת ספורט בשמאל, כותרת בימין
 col_sport, col_title = st.columns([1, 3])
 with col_title:
     st.markdown("<h1 style='text-align:right;'>⚡ SportIQ ULTRA v2</h1>", unsafe_allow_html=True)
 with col_sport:
-    # בחירת ענף בקופסאות נוחות בצד שמאל
     sport_choice = st.radio("בחר ענף:", ["כדורגל ⚽", "כדורסל 🏀"], horizontal=True, label_visibility="collapsed")
     st.session_state.selected_sport = sport_choice
 
 st.divider()
 
-# הבאת המשחקים
 with st.spinner("🔄 מעדכן נתונים..."):
     games_by_date = api.fetch_games_for_dates(sport=sport_choice, days=5)
 
@@ -52,23 +42,19 @@ if not games_by_date:
     st.error("❌ לא נמצאו משחקים בימים הקרובים")
     st.stop()
 
-# ניווט תאריכים בחלק העליון המרכזי (במקום בסרגל)
 st.markdown("### 📅 בחר תאריך למשחקים:")
 dates_list = sorted(list(games_by_date.keys()))
-# הפיכת תאריכים לפורמט קריא יותר
 formatted_dates = [datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m") for d in dates_list]
 
 selected_date_index = st.radio("תאריך:", range(len(dates_list)), format_func=lambda x: formatted_dates[x], horizontal=True, label_visibility="collapsed")
 selected_date = dates_list[selected_date_index]
 daily_games = games_by_date[selected_date]
 
-# סרגל צד: חיפוש ובחירת משחק ספציפי
 with st.sidebar:
     st.markdown("### 🔍 סינון משחקים להיום")
     search_query = st.text_input("חפש שם קבוצה...", placeholder="לדוגמה: מכבי...")
     st.divider()
     
-    # סינון המשחקים לפי החיפוש
     if search_query:
         daily_games = [g for g in daily_games if search_query.lower() in g['home'].lower() or search_query.lower() in g['away'].lower()]
     
@@ -81,8 +67,7 @@ with st.sidebar:
     selected_game_str = st.radio("רשימת משחקים", options=list(game_options.keys()), label_visibility="collapsed")
     selected_game = game_options[selected_game_str]
 
-# טעינת נתונים למשחק הנבחר
-with st.spinner("📊 מנתח יחסי הימורים וסטטיסטיקות..."):
+with st.spinner("📊 מנתח נתונים, יחסים ופצועים..."):
     deep_data = api.get_game_deep_data(selected_game['id'], selected_game['home_id'], selected_game['away_id'], selected_game['home'], selected_game['away'])
 
 st.markdown(f"""
@@ -93,13 +78,12 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["💰 נתונים ויחסים", "⚔️ היסטוריה וסטטיסטיקה", "🧠 ניתוח AI"])
+tab1, tab2, tab3 = st.tabs(["💰 נתונים ויחסים", "⚔️ היסטוריה וסטטיסטיקה", "🧠 ניתוח AI חכם"])
 
 with tab1:
     st.markdown("#### 🎲 יחסי הימורים (Match Odds)")
     odds = deep_data['odds']
     
-    # הצגת יחסים בצורה בולטת באמצעות HTML אישי
     st.markdown(f"""
         <div style="display:flex; gap:15px; margin-bottom:20px;">
             <div class="metric-card" style="flex:1;"><div class="metric-label">ניצחון בית (1)</div><div class="metric-val">{odds.get('1', '-')}</div></div>
@@ -108,13 +92,29 @@ with tab1:
         </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("#### 📋 כושר נוכחי (5 אחרונים)")
-    def render_form(team, form_data):
-        html = f"<div style='margin-bottom:10px;'><b style='color:#00f0ff;'>{team}</b><div style='display:flex; gap:4px; margin-top:5px;'>"
-        for res, color in form_data: html += f"<span class='form-badge' style='background-color:{color};'>{res}</span>"
-        return html + "</div></div>"
+    col_form, col_inj = st.columns([1, 1], gap="large")
     
-    st.markdown(f"<div class='data-box'>{render_form(selected_game['home'], deep_data['home_stats'].get('form', []))}{render_form(selected_game['away'], deep_data['away_stats'].get('form', []))}</div>", unsafe_allow_html=True)
+    with col_form:
+        st.markdown("#### 📋 כושר נוכחי (5 אחרונים)")
+        def render_form(team, form_data):
+            html = f"<div style='margin-bottom:10px;'><b style='color:#00f0ff;'>{team}</b><div style='display:flex; gap:4px; margin-top:5px;'>"
+            for res, color in form_data: html += f"<span class='form-badge' style='background-color:{color};'>{res}</span>"
+            return html + "</div></div>"
+        st.markdown(f"<div class='data-box'>{render_form(selected_game['home'], deep_data['home_stats'].get('form', []))}{render_form(selected_game['away'], deep_data['away_stats'].get('form', []))}</div>", unsafe_allow_html=True)
+        
+    with col_inj:
+        st.markdown("#### 🚑 שחקנים חסרים / פצועים")
+        st.markdown(f"<div class='data-box'>", unsafe_allow_html=True)
+        st.markdown(f"**{selected_game['home']}:**")
+        for p in deep_data.get('missing_home', []):
+            if p in ["סגל מלא", "נתונים לא זמינים"]: st.success(p)
+            else: st.error(f"🚑 {p}")
+            
+        st.markdown(f"**{selected_game['away']}:**")
+        for p in deep_data.get('missing_away', []):
+            if p in ["סגל מלא", "נתונים לא זמינים"]: st.success(p)
+            else: st.error(f"🚑 {p}")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 with tab2:
     if deep_data['h2h_summary'].get('total', 0) > 0:
@@ -130,18 +130,29 @@ with tab2:
         st.info("אין מפגשים קודמים מתועדים בין הקבוצות.")
 
 with tab3:
-    st.markdown("#### 🧠 מנוע ניתוח AI (Google Gemini)")
-    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
+    st.markdown("#### 🧠 מנוע ניתוח AI")
+    ai_provider = st.radio("בחר ספק מודל AI:", ["Groq (Llama 3 - מומלץ חינם)", "ChatGPT (OpenAI)", "Gemini (Google)"], horizontal=True)
+    
+    # חילוץ מפתח ה-API בהתאם לבחירה
+    if "Gemini" in ai_provider:
+        api_key = os.environ.get("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
+    elif "ChatGPT" in ai_provider:
+        api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
+    else:
+        api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
         
-    if not GEMINI_API_KEY:
-        st.error("❌ חסר מפתח API של Gemini ב-Secrets")
+    if not api_key:
+        st.error(f"❌ חסר מפתח API עבור {ai_provider}. הוסף אותו ל-Secrets או ל-Environment Variables.")
     else:
         game_id_str = str(selected_game['id'])
         if game_id_str in st.session_state.ai_results:
             st.success("✅ ניתוח הושלם")
             st.markdown(st.session_state.ai_results[game_id_str])
+            if st.button("🔄 רענן ונתח מחדש"):
+                del st.session_state.ai_results[game_id_str]
+                st.rerun()
         else:
-            if st.button("🚀 הפעל ניתוח AI", use_container_width=True):
+            if st.button(f"🚀 הפעל ניתוח AI באמצעות {ai_provider}", use_container_width=True):
                 with st.spinner("🤖 מנתח את כל הנתונים..."):
-                    st.session_state.ai_results[game_id_str] = ai.analyze_match(st.session_state.selected_sport, selected_game, deep_data, GEMINI_API_KEY)
+                    st.session_state.ai_results[game_id_str] = ai.analyze_match(st.session_state.selected_sport, selected_game, deep_data, api_key, ai_provider)
                     st.rerun()
