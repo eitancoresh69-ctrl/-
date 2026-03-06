@@ -9,7 +9,7 @@ st.set_page_config(page_title="SportIQ ULTRA", layout="wide", initial_sidebar_st
 if 'ai_results' not in st.session_state:
     st.session_state.ai_results = {}
 
-# --- CSS מעודכן (עיצוב מדויק לסגנון שלך) ---
+# --- CSS מעודכן (עיצוב מדויק לסגנון שלך וסידור סרגל הצד) ---
 st.markdown("""
     <style>
         .stApp, [data-testid="stSidebar"] { direction: rtl !important; font-family: 'Heebo', sans-serif; }
@@ -17,10 +17,18 @@ st.markdown("""
         [data-testid="stSidebar"] { background-color: #0c1220 !important; border-left: 1px solid rgba(0,240,255,0.08) !important; }
         p, div, span, label, h1, h2, h3 { text-align: right !important; direction: rtl !important; }
         
-        /* כרטיסיות מידע בסרגל הצד */
+        /* כרטיסיות מידע ומשחקים בסרגל הצד */
         .stRadio > div { gap: 8px !important; }
         .stRadio label { background: rgba(255,255,255,0.02) !important; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 8px !important; padding: 10px !important; }
         .stRadio label:hover { border-color: #00f0ff !important; background: rgba(0,240,255,0.05) !important; }
+        
+        /* 🔥 תיקון הצבע של המשחקים בסרגל הצד 🔥 */
+        [data-testid="stSidebar"] .stRadio label p, 
+        [data-testid="stSidebar"] .stRadio label span {
+            color: #ffffff !important;
+            font-size: 0.9rem !important;
+            font-weight: 500 !important;
+        }
         
         /* קופסאות נתונים */
         .data-box { background: #111927; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 15px; margin-bottom: 15px; }
@@ -95,16 +103,15 @@ with col_data:
         
         <div class='data-box'>
             <h4>📈 סטטיסטיקות משחק (קרנות/כרטיסים)</h4>
-            {deep_data['stats']}
+            <span style="color:#e8f4f8; font-size:0.9rem;">{deep_data['stats']}</span>
         </div>
     """, unsafe_allow_html=True)
 
 with col_ai:
-    st.markdown("### 🧠 מנוע AI (Gemini 1.5 Pro)")
+    st.markdown("### 🧠 מנוע AI (Gemini)")
     
     game_id_str = str(selected_game['id'])
     
-    # בדיקה האם הניתוח כבר קיים בזיכרון של Session State
     if game_id_str in st.session_state.ai_results:
         st.success("ניתוח מהזיכרון:")
         st.write(st.session_state.ai_results[game_id_str])
@@ -116,6 +123,5 @@ with col_ai:
         if st.button("הפעל ניתוח AI עמוק ⚡"):
             with st.spinner("מעבד נתונים, שוקל פצועים ומחשב הסתברויות..."):
                 result = ai.analyze_match(sport_choice, selected_game, deep_data, GEMINI_API_KEY)
-                # שמירה לזיכרון!
                 st.session_state.ai_results[game_id_str] = result
                 st.rerun()
