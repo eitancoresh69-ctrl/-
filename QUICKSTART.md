@@ -1,73 +1,21 @@
-# ⚡ Quick Start - SportIQ ULTRA
+MIT License
 
-**Get started in 5 minutes!**
+Copyright (c) 2026 SportIQ ULTRA Contributors
 
-## 1. Clone Repository
-```bash
-git clone https://github.com/yourusername/SportIQ-ULTRA.git
-cd SportIQ-ULTRA
-```
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-## 2. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-## 3. Configure API Key
-```bash
-mkdir -p .streamlit
-echo 'GEMINI_API_KEY = "your-api-key"' > .streamlit/secrets.toml
-```
-
-Get free API key: https://makersuite.google.com/app/apikey
-
-## 4. Run Application
-```bash
-streamlit run app.py
-```
-
-## 5. Open Browser
-Visit: `http://localhost:8501`
-
-## That's It! 🎉
-
-You now have:
-- 📊 Live sports odds
-- 🧠 AI-powered analysis
-- ⚔️ Head-to-head history
-- 📈 Team statistics
-- 🚑 Injury reports
-
-## Features by Tab
-
-**📊 Data Tab**
-- Real-time odds (1x2, Over/Under)
-- Team form (last 5 games)
-- Goal statistics
-
-**⚔️ H2H Tab**
-- Last 10 head-to-head matches
-- Win/Draw/Loss summary
-- Score comparisons
-
-**🧠 AI Tab**
-- Gemini-powered analysis
-- Value betting detection
-- Confidence levels
-
-**📈 Stats Tab**
-- Detailed team metrics
-- Home/Away splits
-- Win rate analysis
-
-## Support
-See README.md for full documentation
-See INSTALLATION.md for detailed setup
-
-## Tips
-- Change date range in sidebar to find games
-- AI analysis takes 2-3 seconds
-- Data updates every 30 minutes (cache)
-- Works best with Chrome or Firefox
-
-Enjoy! 🚀
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
