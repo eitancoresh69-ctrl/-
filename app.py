@@ -1,188 +1,652 @@
 import streamlit as st
-import api_sofascore as api
-import ai_analyzer as ai
+import api_sofascore_improved as api
+import ai_analyzer_improved as ai
+from datetime import datetime, timedelta
+import pandas as pd
 
-st.set_page_config(page_title="SportIQ ULTRA", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="SportIQ ULTRA v2", 
+    layout="wide", 
+    initial_sidebar_state="expanded",
+    menu_items={
+        "Get Help": "https://github.com",
+        "Report a bug": None,
+        "About": "SportIQ ULTRA - מערכת ניתוח ספורט ו-AI"
+    }
+)
 
+# מצבים
 if 'ai_results' not in st.session_state:
     st.session_state.ai_results = {}
+if 'selected_sport' not in st.session_state:
+    st.session_state.selected_sport = "כדורגל ⚽"
 
+# עיצוב CSS משופר
 st.markdown("""
     <style>
-        .stApp, [data-testid="stSidebar"] { direction: rtl !important; font-family: 'Heebo', sans-serif; }
-        .stApp { background-color: #02040a !important; color: #e8f4f8 !important; }
-        [data-testid="stSidebar"] { background-color: #0c1220 !important; border-left: 1px solid rgba(0,240,255,0.08) !important; }
-        p, div, span, label, h1, h2, h3 { text-align: right !important; direction: rtl !important; }
+        * { 
+            direction: rtl !important; 
+            font-family: 'Segoe UI', 'Heebo', sans-serif !important;
+        }
         
-        .stRadio > div { gap: 8px !important; }
-        .stRadio label { background: rgba(255,255,255,0.02) !important; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 8px !important; padding: 10px !important; }
-        .stRadio label:hover { border-color: #00f0ff !important; background: rgba(0,240,255,0.05) !important; }
-        [data-testid="stSidebar"] .stRadio label p, [data-testid="stSidebar"] .stRadio label span { color: #ffffff !important; font-size: 0.9rem !important; }
+        .stApp { 
+            background: linear-gradient(135deg, #02040a 0%, #0a1622 100%) !important; 
+            color: #e8f4f8 !important; 
+        }
         
-        .data-box { background: #111927; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 15px; margin-bottom: 15px; }
-        .data-box h4 { color: #00f0ff; margin-top: 0; font-size: 0.9rem; margin-bottom: 15px;}
+        [data-testid="stSidebar"] { 
+            background: linear-gradient(180deg, #0c1220 0%, #131d2d 100%) !important; 
+            border-left: 2px solid rgba(0,240,255,0.15) !important; 
+        }
         
-        .stButton > button { background: linear-gradient(135deg, rgba(0,240,255,0.1), rgba(0,255,136,0.1)) !important; border: 1px solid rgba(0,240,255,0.3) !important; color: #00f0ff !important; width: 100%; font-weight: bold;}
-        .stButton > button:hover { border-color: #00f0ff !important; box-shadow: 0 0 15px rgba(0,240,255,0.2) !important; color: white !important;}
-        #MainMenu, footer {visibility: hidden;}
+        [data-testid="stHeader"] { background: transparent !important; }
+        [data-testid="stDecoration"] { display: none; }
+        
+        h1, h2, h3, h4, h5 { 
+            color: #00f0ff !important; 
+            font-weight: 700 !important;
+            letter-spacing: 0.5px;
+        }
+        
+        p, span, div, label { 
+            text-align: right !important; 
+            direction: rtl !important;
+        }
+        
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] { 
+            gap: 8px !important;
+            border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+        }
+        
+        .stTabs [aria-selected="true"] { 
+            border-bottom: 2px solid #00f0ff !important !important;
+        }
+        
+        /* Cards */
+        .stMetric { 
+            background: rgba(0, 240, 255, 0.05) !important;
+            padding: 15px !important;
+            border-radius: 10px !important;
+            border: 1px solid rgba(0, 240, 255, 0.15) !important;
+        }
+        
+        /* Buttons */
+        .stButton > button {
+            background: linear-gradient(135deg, rgba(0,240,255,0.2), rgba(0,255,136,0.1)) !important;
+            border: 1px solid rgba(0,240,255,0.4) !important;
+            color: #00f0ff !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s !important;
+        }
+        
+        .stButton > button:hover {
+            border-color: #00f0ff !important;
+            box-shadow: 0 0 20px rgba(0,240,255,0.3) !important;
+            color: white !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        /* Input boxes */
+        .stSelectbox > div > div,
+        .stRadio > div,
+        .stDateInput > div > div {
+            background: rgba(20, 30, 50, 0.7) !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+            border-radius: 8px !important;
+        }
+        
+        /* Expanders */
+        .streamlit-expanderHeader {
+            background: rgba(0, 240, 255, 0.08) !important;
+            border: 1px solid rgba(0, 240, 255, 0.15) !important;
+            border-radius: 8px !important;
+        }
+        
+        /* Data boxes */
+        .data-box {
+            background: rgba(17, 25, 39, 0.6) !important;
+            border: 1px solid rgba(0, 240, 255, 0.15) !important;
+            border-radius: 10px !important;
+            padding: 18px !important;
+            margin-bottom: 15px !important;
+            backdrop-filter: blur(10px) !important;
+        }
+        
+        .data-box h4 {
+            color: #00f0ff !important;
+            margin-top: 0 !important;
+            font-size: 0.95rem !important;
+            margin-bottom: 15px !important;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* Form badges */
+        .form-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            font-weight: 900;
+            font-size: 12px;
+            margin: 0 3px;
+            color: #111927;
+        }
+        
+        /* Divider */
+        .stDivider {
+            border-color: rgba(0, 240, 255, 0.15) !important;
+        }
+        
+        /* Success/Info boxes */
+        .stSuccess, .stInfo, .stWarning, .stError {
+            border-radius: 8px !important;
+            border-left: 3px solid !important;
+        }
+        
+        .stSuccess {
+            background: rgba(0, 255, 136, 0.08) !important;
+            border-left-color: #00ff88 !important;
+        }
+        
+        .stInfo {
+            background: rgba(0, 240, 255, 0.08) !important;
+            border-left-color: #00f0ff !important;
+        }
+        
+        .stWarning {
+            background: rgba(255, 217, 74, 0.08) !important;
+            border-left-color: #ffd94a !important;
+        }
+        
+        .stError {
+            background: rgba(255, 59, 92, 0.08) !important;
+            border-left-color: #ff3b5c !important;
+        }
+        
+        /* Hide footer */
+        #MainMenu { visibility: hidden; }
+        footer { visibility: hidden; }
+        
+        /* Stats row */
+        .stats-row {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            background: rgba(0, 240, 255, 0.08);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px 15px;
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #00ff88;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: #a8b2c1;
+            margin-top: 4px;
+        }
+        
+        /* Progress bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00f0ff, #00ff88);
+            border-radius: 4px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+# Header
+col1, col2, col3 = st.columns([1, 1, 1])
+with col1:
+    pass
+with col2:
+    st.markdown("<h1 style='text-align:center;'>⚡ SportIQ ULTRA v2</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size:0.9rem; color:#a8b2c1;'>מערכת ניתוח ספורט מתקדמת עם AI</p>", unsafe_allow_html=True)
+with col3:
+    pass
 
-def render_form_badges(form_data):
-    if not form_data: return "<span style='color:gray;'>אין נתונים</span>"
-    html = "<div style='display:flex; gap: 5px; direction:ltr;'>"
-    for res, color in form_data:
-        html += f"<span style='background-color:{color}; color:#111927; font-weight:900; width:22px; height:22px; display:flex; align-items:center; justify-content:center; border-radius:4px; font-size:11px;'>{res}</span>"
-    html += "</div>"
-    return html
+st.divider()
 
-def parse_odds_to_decimal(odd_str):
-    try:
-        if '/' in str(odd_str):
-            n, d = str(odd_str).split('/')
-            return (float(n) / float(d)) + 1
-        return float(odd_str)
-    except:
-        return 0
-
+# Sidebar
 with st.sidebar:
-    st.markdown("<h1 style='color:#00f0ff;'>⚡ SportIQ ULTRA</h1>", unsafe_allow_html=True)
-    st.divider()
-    sport_choice = st.radio("ענף:", ["כדורגל ⚽", "כדורסל 🏀"], horizontal=True)
+    st.markdown("<h2 style='text-align:center;'>🎯 בחירות</h2>", unsafe_allow_html=True)
     st.divider()
     
-    with st.spinner("סורק משחקים מ-SofaScore..."):
+    # בחירת ספורט
+    sport_choice = st.radio(
+        "🏅 ענף ספורט:",
+        ["כדורגל ⚽", "כדורסל 🏀"],
+        horizontal=False,
+        key="sport_choice"
+    )
+    st.session_state.selected_sport = sport_choice
+    
+    st.divider()
+    
+    # טעינת משחקים
+    st.markdown("📅 **משחקים הקרובים**")
+    with st.spinner("🔄 טוען משחקים..."):
         games_by_date = api.fetch_games_for_dates(sport=sport_choice, days=7)
     
     if not games_by_date:
-        st.warning("לא נמצאו משחקים בליגות המטרה בימים הקרובים.")
+        st.error("❌ לא נמצאו משחקים בליגות המטרה")
         st.stop()
     
-    selected_date = st.selectbox("📅 בחר תאריך למשחקים:", list(games_by_date.keys()))
-    st.markdown(f"**משחקים ל-{selected_date}:**")
-    daily_games = games_by_date[selected_date]
+    # בחירת טווח תאריכים
+    dates_list = sorted(list(games_by_date.keys()))
+    col_start, col_end = st.columns(2)
     
-    game_options = {f"{g['time']} | {g['home']} - {g['away']}": g for g in daily_games}
-    selected_game_str = st.radio("בחר משחק:", list(game_options.keys()), label_visibility="collapsed")
+    with col_start:
+        start_date = st.selectbox(
+            "מתאריך:",
+            dates_list,
+            index=0,
+            key="start_date"
+        )
+    
+    with col_end:
+        end_date = st.selectbox(
+            "עד תאריך:",
+            dates_list,
+            index=min(2, len(dates_list)-1),
+            key="end_date"
+        )
+    
+    st.divider()
+    
+    # סינון משחקים לתאריכים הנבחרים
+    filtered_games = []
+    for date_str in dates_list:
+        if start_date <= date_str <= end_date:
+            filtered_games.extend(games_by_date[date_str])
+    
+    if not filtered_games:
+        st.warning("⚠️ אין משחקים בטווח התאריכים שנבחר")
+        st.stop()
+    
+    # בחירת משחק
+    game_options = {
+        f"🕐 {g['time']} | {g['home']} ⚔️ {g['away']} | {g['league'][:20]}": g 
+        for g in filtered_games
+    }
+    
+    st.markdown("**בחר משחק לניתוח:**")
+    selected_game_str = st.selectbox(
+        "משחק:",
+        list(game_options.keys()),
+        label_visibility="collapsed",
+        index=0
+    )
     selected_game = game_options[selected_game_str]
-
-st.markdown(f"<h2>{selected_game['home']} <span style='color:#00f0ff'>VS</span> {selected_game['away']}</h2>", unsafe_allow_html=True)
-st.caption(f"ליגה: {selected_game['league']} | שעה (שעון ישראל): {selected_game['time']} | תאריך: {selected_date}")
-
-with st.spinner("מושך נתוני עומק..."):
-    deep_data = api.get_game_deep_data(selected_game['id'], selected_game['home_id'], selected_game['away_id'])
-
-col_data, col_ai = st.columns([1.3, 1.2], gap="large")
-
-with col_data:
-    st.markdown("### 📊 לוח נתונים (Live)")
     
-    h_odd = parse_odds_to_decimal(deep_data['odds'].get('1', '0'))
-    d_odd = parse_odds_to_decimal(deep_data['odds'].get('X', '0'))
-    a_odd = parse_odds_to_decimal(deep_data['odds'].get('2', '0'))
+    st.divider()
     
-    h_prob = 100 / h_odd if h_odd > 0 else 0
-    d_prob = 100 / d_odd if d_odd > 0 else 0
-    a_prob = 100 / a_odd if a_odd > 0 else 0
-    total_prob = h_prob + d_prob + a_prob
-    
-    prob_html = ""
-    if total_prob > 0:
-        h_norm = (h_prob / total_prob) * 100
-        d_norm = (d_prob / total_prob) * 100
-        a_norm = (a_prob / total_prob) * 100
-        fav_text = f"פייבוריטית: {selected_game['home']}" if h_norm > a_norm and h_norm > d_norm else (f"פייבוריטית: {selected_game['away']}" if a_norm > h_norm and a_norm > d_norm else "משחק שקול")
-            
-        prob_html = f"""
-        <div style='margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;'>
-            <div style='font-size:0.75rem; color:#00f0ff; margin-bottom:5px;'>📊 מדד עוצמה ({fav_text})</div>
-            <div style='display:flex; width:100%; height:8px; border-radius:4px; overflow:hidden;'>
-                <div style='width:{h_norm}%; background-color:#00ff88;'></div>
-                <div style='width:{d_norm}%; background-color:#ffd94a;'></div>
-                <div style='width:{a_norm}%; background-color:#ff3b5c;'></div>
-            </div>
-            <div style='display:flex; justify-content:space-between; font-size:0.65rem; color:gray; margin-top:4px;'>
-                <span>בית ({int(h_norm)}%)</span>
-                <span>תיקו ({int(d_norm)}%)</span>
-                <span>חוץ ({int(a_norm)}%)</span>
-            </div>
-        </div>
-        """
-
-    h2h_html = "".join([f"<div style='font-size: 0.85rem; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color:#e8f4f8;'>{m}</div>" for m in deep_data["h2h_matches"]])
-    if not h2h_html: h2h_html = "<span style='color:gray;'>אין מפגשים קודמים קרובים.</span>"
-    
+    # סטטוס
     st.markdown(f"""
-        <div class='data-box'>
-            <h4>יחסי זכייה (Odds)</h4>
-            <b>1:</b> {deep_data['odds'].get('1', '-')} &nbsp;|&nbsp; 
-            <b>X:</b> {deep_data['odds'].get('X', '-')} &nbsp;|&nbsp; 
-            <b>2:</b> {deep_data['odds'].get('2', '-')}
-            {prob_html}
-        </div>
-        
-        <div class='data-box'>
-            <h4>כושר נוכחי ומאזן שערים (5 משחקים אחרונים)</h4>
-            <div style='display:flex; justify-content:space-between; margin-bottom:12px; background:rgba(0,0,0,0.2); padding:10px; border-radius:6px;'>
-                <div style='text-align:right;'>
-                    <div style='font-size:0.75rem; color:gray; margin-bottom:4px;'>{selected_game['home']} (כללי)</div>
-                    {render_form_badges(deep_data['home_form'])}
-                    <div style='font-size:0.7rem; color:#00f0ff; margin-top:6px;'>⚽ זכות: {deep_data['home_goals'][0]} | 🥅 חובה: {deep_data['home_goals'][1]}</div>
-                </div>
-                <div style='text-align:left;'>
-                    <div style='font-size:0.75rem; color:gray; margin-bottom:4px;'>{selected_game['away']} (כללי)</div>
-                    {render_form_badges(deep_data['away_form'])}
-                    <div style='font-size:0.7rem; color:#00f0ff; margin-top:6px;'>⚽ זכות: {deep_data['away_goals'][0]} | 🥅 חובה: {deep_data['away_goals'][1]}</div>
-                </div>
-            </div>
-            <div style='display:flex; justify-content:space-between; padding:0 10px;'>
-                <div style='text-align:right;'>
-                    <div style='font-size:0.75rem; color:#00f0ff; margin-bottom:4px;'>{selected_game['home']} (בבית)</div>
-                    {render_form_badges(deep_data['home_home_form'])}
-                </div>
-                <div style='text-align:left;'>
-                    <div style='font-size:0.75rem; color:#00f0ff; margin-bottom:4px;'>{selected_game['away']} (בחוץ)</div>
-                    {render_form_badges(deep_data['away_away_form'])}
-                </div>
-            </div>
-        </div>
-
-        <div class='data-box'>
-            <h4>⚔️ היסטוריית מפגשים (H2H - אחרונים)</h4>
-            {h2h_html}
-        </div>
-        
-        <div class='data-box'>
-            <h4>🚑 פצועים / הרכבים חסרים</h4>
-            <div style='display:flex; justify-content:space-between; gap: 15px;'>
-                <div style='text-align:right; flex:1;'>
-                    <div style='font-size:0.75rem; color:#00f0ff; margin-bottom:4px; font-weight:bold;'>{selected_game['home']}</div>
-                    <span style='color:#ff3b5c; font-size:0.8rem; line-height:1.4;'>{deep_data['missing_home']}</span>
-                </div>
-                <div style='text-align:left; flex:1;'>
-                    <div style='font-size:0.75rem; color:#00f0ff; margin-bottom:4px; font-weight:bold;'>{selected_game['away']}</div>
-                    <span style='color:#ff3b5c; font-size:0.8rem; line-height:1.4;'>{deep_data['missing_away']}</span>
-                </div>
-            </div>
+        <div style='background: rgba(0,240,255,0.08); border-left: 3px solid #00f0ff; padding: 12px; border-radius: 6px;'>
+            <div style='font-size: 0.85rem; color: #a8b2c1; margin-bottom: 4px;'>🎯 משחק נבחר</div>
+            <div style='font-size: 0.95rem; color: #00f0ff; font-weight: 600;'>{selected_game['home']} vs {selected_game['away']}</div>
+            <div style='font-size: 0.8rem; color: #7a8a99; margin-top: 4px;'>{selected_game['league']}</div>
         </div>
     """, unsafe_allow_html=True)
 
-with col_ai:
-    st.markdown("### 🧠 מנוע AI (Gemini 1.5 Flash)")
-    game_id_str = str(selected_game['id'])
+# הטעינת נתונים עמוקים
+st.markdown("### 🔄 טוען נתוני עומק...")
+with st.spinner("📊 מושך נתונים מכמה מקורות..."):
+    deep_data = api.get_game_deep_data(
+        selected_game['id'], 
+        selected_game['home_id'], 
+        selected_game['away_id']
+    )
+
+st.markdown(f"""
+    <div style='display: flex; justify-content: space-between; align-items: center; margin: 20px 0;'>
+        <h2 style='margin: 0;'>{selected_game['home']}</h2>
+        <span style='color: #00f0ff; font-size: 1.5rem; font-weight: bold;'>VS</span>
+        <h2 style='margin: 0;'>{selected_game['away']}</h2>
+    </div>
+    <p style='text-align: center; color: #a8b2c1; margin: 0;'>
+        ⏰ {selected_game['time']} | 📍 {selected_game['league']} | 📅 {selected_game['datetime']}
+    </p>
+""", unsafe_allow_html=True)
+
+st.divider()
+
+# Tabs עיקריות
+tab1, tab2, tab3, tab4 = st.tabs(["📊 נתונים", "⚔️ H2H", "🧠 ניתוח AI", "📈 סטטיסטיקות"])
+
+# TAB 1: נתונים עיקריים
+with tab1:
+    col_odds, col_form = st.columns([1.2, 1], gap="large")
     
-    if game_id_str in st.session_state.ai_results:
-        st.success("ניתוח מהזיכרון:")
-        st.write(st.session_state.ai_results[game_id_str])
-        if st.button("🔄 רענן ניתוח AI מחדש"):
-            del st.session_state.ai_results[game_id_str]
-            st.rerun()
+    with col_odds:
+        st.markdown("#### 💰 יחסי זכייה (Odds)")
+        
+        odds = deep_data['odds']
+        odds_html = f"""
+            <div class='data-box'>
+                <div style='display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;'>
+                    <div style='background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3); padding: 12px; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 0.8rem; color: #a8b2c1; margin-bottom: 4px;'>1 (בית)</div>
+                        <div style='font-size: 1.3rem; color: #00ff88; font-weight: bold;'>{odds.get('1', '-')}</div>
+                    </div>
+                    <div style='background: rgba(255, 217, 74, 0.1); border: 1px solid rgba(255, 217, 74, 0.3); padding: 12px; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 0.8rem; color: #a8b2c1; margin-bottom: 4px;'>X (תיקו)</div>
+                        <div style='font-size: 1.3rem; color: #ffd94a; font-weight: bold;'>{odds.get('X', '-')}</div>
+                    </div>
+                    <div style='background: rgba(255, 59, 92, 0.1); border: 1px solid rgba(255, 59, 92, 0.3); padding: 12px; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 0.8rem; color: #a8b2c1; margin-bottom: 4px;'>2 (חוץ)</div>
+                        <div style='font-size: 1.3rem; color: #ff3b5c; font-weight: bold;'>{odds.get('2', '-')}</div>
+                    </div>
+                </div>
+                
+                <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'>
+                    <div style='background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.3); padding: 10px; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 0.75rem; color: #a8b2c1;'>Over 2.5</div>
+                        <div style='font-size: 1.1rem; color: #00f0ff; font-weight: bold;'>{odds.get('over_2_5', '-')}</div>
+                    </div>
+                    <div style='background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.3); padding: 10px; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 0.75rem; color: #a8b2c1;'>Under 2.5</div>
+                        <div style='font-size: 1.1rem; color: #00f0ff; font-weight: bold;'>{odds.get('under_2_5', '-')}</div>
+                    </div>
+                </div>
+            </div>
+        """
+        st.markdown(odds_html, unsafe_allow_html=True)
+    
+    with col_form:
+        st.markdown("#### 📋 כושר נוכחי (5 משחקים אחרונים)")
+        
+        home_form = deep_data['home_stats'].get('form', [])
+        away_form = deep_data['away_stats'].get('form', [])
+        
+        form_html = f"""
+            <div class='data-box'>
+                <div style='margin-bottom: 15px;'>
+                    <div style='font-size: 0.85rem; color: #00f0ff; font-weight: 600; margin-bottom: 8px;'>{selected_game['home']}</div>
+                    <div style='display: flex; gap: 4px;'>
+        """
+        
+        for result, color in home_form:
+            form_html += f"<span class='form-badge' style='background-color: {color};'>{result}</span>"
+        
+        form_html += f"""
+                    </div>
+                </div>
+                
+                <div>
+                    <div style='font-size: 0.85rem; color: #00f0ff; font-weight: 600; margin-bottom: 8px;'>{selected_game['away']}</div>
+                    <div style='display: flex; gap: 4px;'>
+        """
+        
+        for result, color in away_form:
+            form_html += f"<span class='form-badge' style='background-color: {color};'>{result}</span>"
+        
+        form_html += """
+                    </div>
+                </div>
+            </div>
+        """
+        st.markdown(form_html, unsafe_allow_html=True)
+    
+    # שערים וסטטיסטיקה
+    st.divider()
+    
+    col_home_stats, col_away_stats = st.columns([1, 1], gap="large")
+    
+    with col_home_stats:
+        home_stats = deep_data['home_stats']
+        st.markdown(f"#### ⚽ {selected_game['home']} (בית)")
+        
+        stats_html = f"""
+            <div class='data-box'>
+                <div class='stats-row'>
+                    <div class='stat-item'>
+                        <div class='stat-value'>{home_stats.get('wins', 0)}</div>
+                        <div class='stat-label'>ניצחונות</div>
+                    </div>
+                    <div class='stat-item'>
+                        <div class='stat-value'>{home_stats.get('goals_scored', 0)}</div>
+                        <div class='stat-label'>שערים הבקיע</div>
+                    </div>
+                    <div class='stat-item'>
+                        <div class='stat-value'>{home_stats.get('goals_conceded', 0)}</div>
+                        <div class='stat-label'>שערים קיבל</div>
+                    </div>
+                </div>
+                
+                <div style='margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);'>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 8px;'>
+                        <span style='color: #a8b2c1;'>ממוצע שערים:</span>
+                        <span style='color: #00f0ff; font-weight: 600;'>{home_stats.get('avg_goals_for', 0):.2f} / {home_stats.get('avg_goals_against', 0):.2f}</span>
+                    </div>
+                    <div style='display: flex; justify-content: space-between;'>
+                        <span style='color: #a8b2c1;'>Win Rate:</span>
+                        <span style='color: #00ff88; font-weight: 600;'>{home_stats.get('win_rate', 0):.1f}%</span>
+                    </div>
+                </div>
+            </div>
+        """
+        st.markdown(stats_html, unsafe_allow_html=True)
+    
+    with col_away_stats:
+        away_stats = deep_data['away_stats']
+        st.markdown(f"#### ⚽ {selected_game['away']} (חוץ)")
+        
+        stats_html = f"""
+            <div class='data-box'>
+                <div class='stats-row'>
+                    <div class='stat-item'>
+                        <div class='stat-value'>{away_stats.get('wins', 0)}</div>
+                        <div class='stat-label'>ניצחונות</div>
+                    </div>
+                    <div class='stat-item'>
+                        <div class='stat-value'>{away_stats.get('goals_scored', 0)}</div>
+                        <div class='stat-label'>שערים הבקיע</div>
+                    </div>
+                    <div class='stat-item'>
+                        <div class='stat-value'>{away_stats.get('goals_conceded', 0)}</div>
+                        <div class='stat-label'>שערים קיבל</div>
+                    </div>
+                </div>
+                
+                <div style='margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);'>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 8px;'>
+                        <span style='color: #a8b2c1;'>ממוצע שערים:</span>
+                        <span style='color: #00f0ff; font-weight: 600;'>{away_stats.get('avg_goals_for', 0):.2f} / {away_stats.get('avg_goals_against', 0):.2f}</span>
+                    </div>
+                    <div style='display: flex; justify-content: space-between;'>
+                        <span style='color: #a8b2c1;'>Win Rate:</span>
+                        <span style='color: #ff3b5c; font-weight: 600;'>{away_stats.get('win_rate', 0):.1f}%</span>
+                    </div>
+                </div>
+            </div>
+        """
+        st.markdown(stats_html, unsafe_allow_html=True)
+    
+    # פצועים
+    st.divider()
+    st.markdown("#### 🚑 שחקנים חסרים / פצועים")
+    
+    col_home_inj, col_away_inj = st.columns(2)
+    
+    with col_home_inj:
+        st.markdown(f"**{selected_game['home']}:**")
+        missing_home = deep_data['missing_home']
+        if isinstance(missing_home, list) and len(missing_home) > 0:
+            for player in missing_home:
+                st.markdown(f"• {player}")
+        else:
+            st.info("✅ סגל מלא")
+    
+    with col_away_inj:
+        st.markdown(f"**{selected_game['away']}:**")
+        missing_away = deep_data['missing_away']
+        if isinstance(missing_away, list) and len(missing_away) > 0:
+            for player in missing_away:
+                st.markdown(f"• {player}")
+        else:
+            st.info("✅ סגל מלא")
+
+# TAB 2: H2H
+with tab2:
+    h2h_matches = deep_data['h2h_matches']
+    h2h_summary = deep_data['h2h_summary']
+    
+    if h2h_summary.get('total', 0) > 0:
+        # סטטיסטיקה H2H
+        st.markdown("#### 📊 סטטיסטיקה H2H כוללת")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("סה"כ משחקים", h2h_summary.get('total', 0))
+        with col2:
+            st.metric("ניצחונות בית", h2h_summary.get('home_wins', 0))
+        with col3:
+            st.metric("תיקו", h2h_summary.get('draws', 0))
+        with col4:
+            st.metric("ניצחונות חוץ", h2h_summary.get('away_wins', 0))
+        
+        st.divider()
+        
+        # תוצאות המשחקים
+        st.markdown("#### 📅 תוצאות משחקים קודמים")
+        
+        for match in h2h_matches:
+            result_color = "#00ff88" if match['result'] == "ניצחון בית" else ("#ff3b5c" if match['result'] == "ניצחון חוץ" else "#ffd94a")
+            
+            st.markdown(f"""
+                <div class='data-box'>
+                    <div style='display: flex; justify-content: space-between; align-items: center;'>
+                        <div style='flex: 1; text-align: right;'>
+                            <div style='font-weight: 600; color: #e8f4f8;'>{match['home']}</div>
+                        </div>
+                        <div style='flex: 0.3; text-align: center;'>
+                            <div style='font-size: 1.3rem; font-weight: bold; color: #00f0ff;'>{match['home_score']}-{match['away_score']}</div>
+                            <div style='font-size: 0.75rem; color: {result_color}; margin-top: 4px;'>{match['result']}</div>
+                        </div>
+                        <div style='flex: 1; text-align: left;'>
+                            <div style='font-weight: 600; color: #e8f4f8;'>{match['away']}</div>
+                        </div>
+                    </div>
+                    <div style='text-align: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05);'>
+                        <span style='font-size: 0.8rem; color: #a8b2c1;'>{match['date']}</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
     else:
-        st.info("ה-AI ממתין לפקודה לניתוח הנתונים המלאים.")
-        if st.button("הפעל ניתוח AI עמוק ⚡"):
-            with st.spinner("מעבד היסטוריה, שערי זכות/חובה, ופצועים..."):
-                result = ai.analyze_match(sport_choice, selected_game, deep_data, GEMINI_API_KEY)
-                st.session_state.ai_results[game_id_str] = result
+        st.warning("⚠️ אין מפגשים קודמים מתועדים")
+
+# TAB 3: ניתוח AI
+with tab3:
+    st.markdown("#### 🧠 מנוע ניתוח AI (Gemini 1.5 Flash)")
+    
+    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+    
+    if not GEMINI_API_KEY:
+        st.error("❌ חסר GEMINI_API_KEY ב-secrets")
+    else:
+        game_id_str = str(selected_game['id'])
+        
+        if game_id_str in st.session_state.ai_results:
+            st.success("✅ ניתוח זמין מזיכרון")
+            
+            with st.expander("📖 הצג ניתוח מלא", expanded=True):
+                st.markdown(st.session_state.ai_results[game_id_str])
+            
+            if st.button("🔄 רענן ניתוח AI מחדש", use_container_width=True):
+                del st.session_state.ai_results[game_id_str]
                 st.rerun()
+        else:
+            st.info("⏳ לחץ על כפתור להפעלת הניתוח המתקדם")
+            
+            if st.button("🚀 הפעל ניתוח AI עמוק (Value Betting Analysis)", use_container_width=True):
+                with st.spinner("🤖 מעבד נתונים והרץ ניתוח AI..."):
+                    result = ai.analyze_match(
+                        st.session_state.selected_sport,
+                        selected_game,
+                        deep_data,
+                        GEMINI_API_KEY
+                    )
+                    st.session_state.ai_results[game_id_str] = result
+                    st.rerun()
+
+# TAB 4: סטטיסטיקות מלאות
+with tab4:
+    st.markdown("#### 📈 סטטיסטיקות מפורטות")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown(f"**🏠 {selected_game['home']} (בית)**")
+        
+        home_stats = deep_data['home_stats']
+        st.markdown(f"""
+            - **ניצחונות:** {home_stats.get('wins', 0)}
+            - **תיקו:** {home_stats.get('draws', 0)}
+            - **הפסדים:** {home_stats.get('losses', 0)}
+            - **שערים הבקיע:** {home_stats.get('goals_scored', 0)}
+            - **שערים קיבל:** {home_stats.get('goals_conceded', 0)}
+            - **ממוצע שערים:** {home_stats.get('avg_goals_for', 0):.2f}
+            - **ממוצע שערים נגד:** {home_stats.get('avg_goals_against', 0):.2f}
+        """)
+        
+        if home_stats.get('home_form'):
+            st.markdown("**כושר בבית:**")
+            form_text = "".join([x[0] for x in home_stats.get('home_form', [])])
+            st.code(form_text, language="")
+    
+    with col2:
+        st.markdown(f"**🚗 {selected_game['away']} (חוץ)**")
+        
+        away_stats = deep_data['away_stats']
+        st.markdown(f"""
+            - **ניצחונות:** {away_stats.get('wins', 0)}
+            - **תיקו:** {away_stats.get('draws', 0)}
+            - **הפסדים:** {away_stats.get('losses', 0)}
+            - **שערים הבקיע:** {away_stats.get('goals_scored', 0)}
+            - **שערים קיבל:** {away_stats.get('goals_conceded', 0)}
+            - **ממוצע שערים:** {away_stats.get('avg_goals_for', 0):.2f}
+            - **ממוצע שערים נגד:** {away_stats.get('avg_goals_against', 0):.2f}
+        """)
+        
+        if away_stats.get('away_form'):
+            st.markdown("**כושר בחוץ:**")
+            form_text = "".join([x[0] for x in away_stats.get('away_form', [])])
+            st.code(form_text, language="")
+
+st.divider()
+
+# Footer
+st.markdown("""
+    <p style='text-align: center; color: #7a8a99; font-size: 0.85rem; margin-top: 30px;'>
+        ⚡ SportIQ ULTRA v2 | Data from SofaScore | AI by Google Gemini | 🔐 All data encrypted
+    </p>
+""", unsafe_allow_html=True)
