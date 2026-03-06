@@ -174,8 +174,35 @@ with tab3:
 with tab4:
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f"**🏠 {selected_game['home']}**")
-        st.json(deep_data['home_stats'])
+        st.markdown(f"**🏠 {selected_game['home']} (בית)**")
+        home_stats = deep_data['home_stats']
+        st.markdown(f"""
+            - **ניצחונות:** {home_stats.get('wins', 0)}
+            - **תיקו:** {home_stats.get('draws', 0)}
+            - **הפסדים:** {home_stats.get('losses', 0)}
+            - **שערים הבקיע:** {home_stats.get('goals_scored', 0)}
+            - **שערים קיבל:** {home_stats.get('goals_conceded', 0)}
+            - **ממוצע שערים:** {home_stats.get('avg_goals_for', 0):.2f}
+            - **ממוצע שערים נגד:** {home_stats.get('avg_goals_against', 0):.2f}
+        """)
+        if home_stats.get('home_form'):
+            st.markdown("**כושר בבית:**")
+            form_text = "".join([x[0] for x in home_stats.get('home_form', [])])
+            st.code(form_text, language="")
+            
     with col2:
-        st.markdown(f"**🚗 {selected_game['away']}**")
-        st.json(deep_data['away_stats'])
+        st.markdown(f"**🚗 {selected_game['away']} (חוץ)**")
+        away_stats = deep_data['away_stats']
+        st.markdown(f"""
+            - **ניצחונות:** {away_stats.get('wins', 0)}
+            - **תיקו:** {away_stats.get('draws', 0)}
+            - **הפסדים:** {away_stats.get('losses', 0)}
+            - **שערים הבקיע:** {away_stats.get('goals_scored', 0)}
+            - **שערים קיבל:** {away_stats.get('goals_conceded', 0)}
+            - **ממוצע שערים:** {away_stats.get('avg_goals_for', 0):.2f}
+            - **ממוצע שערים נגד:** {away_stats.get('avg_goals_against', 0):.2f}
+        """)
+        if away_stats.get('away_form'):
+            st.markdown("**כושר בחוץ:**")
+            form_text = "".join([x[0] for x in away_stats.get('away_form', [])])
+            st.code(form_text, language="")
