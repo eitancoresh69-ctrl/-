@@ -11,11 +11,16 @@ HEADERS = {
     "Cache-Control": "no-cache"
 }
 
+# רשימת הליגות המעודכנת בדיוק לפי הבקשה שלך
 TARGET_LEAGUES = [
-    'UEFA Champions League', 'NBA', 'Super League', 'CBA', 
-    'Ligat HaAl', 'LaLiga', 'Copa del Rey', 'Supercopa',
-    'Premier League', 'FA Cup', 'EFL Cup', 'Ligue 1',
-    'Serie A', 'Bundesliga', 'MLS', 'Euroleague', 'MLS Next Pro'
+    'UEFA Champions League',             # ליגת האלופות
+    'NBA',                               # NBA
+    'Super League', 'Ligat Winner',      # ליגת כדורסל בישראל (בסופא-סקור נקראת Super League)
+    'CBA',                               # ליגת הכדורסל של סין
+    'Ligat HaAl', 'Ligat Al',            # ליגת העל בישראל (כדורגל)
+    'LaLiga', 'Copa del Rey', 'Supercopa', # הליגה הספרדית כולל גביעים
+    'Premier League', 'FA Cup', 'EFL Cup', # הליגה האנגלית כולל גביעים
+    'Ligue 1', 'Coupe de France'         # הליגה הצרפתית
 ]
 
 def get_israel_time(utc_timestamp):
@@ -42,6 +47,7 @@ def fetch_games_for_dates(sport="soccer", days=7):
             if res.status_code == 200:
                 for event in res.json().get("events", []):
                     league = event.get("tournament", {}).get("name", "")
+                    # בדיקה אם הליגה נמצאת ברשימה המצומצמת שלנו
                     if any(target in league for target in TARGET_LEAGUES):
                         israel_time = get_israel_time(event.get("startTimestamp", 0))
                         games_by_date[target_date].append({
@@ -71,7 +77,7 @@ def get_team_stats(team_id, include_home_away=False):
             for e in events:
                 h_score = e.get("homeScore", {}).get("current")
                 a_score = e.get("awayScore", {}).get("current")
-                if h_score is None or a_score is None: continue # מוודא שהמשחק אכן הסתיים ויש תוצאה
+                if h_score is None or a_score is None: continue
                 
                 is_h = e.get("homeTeam", {}).get("id") == team_id
                 
@@ -103,7 +109,6 @@ def get_h2h_data(game_id, home_id, away_id):
                 h_score = e.get("homeScore", {}).get("current")
                 a_score = e.get("awayScore", {}).get("current")
                 
-                # התיקון: במקום לבדוק סטטוס, פשוט בודקים אם יש תוצאות אמיתיות
                 if h_score is None or a_score is None: continue
                 
                 h2h_data["matches"].append({
@@ -137,7 +142,6 @@ def get_odds_from_the_odds_api(home_team, away_team):
                 api_home = game['home_team'].lower()
                 api_away = game['away_team'].lower()
                 
-                # אלגוריתם זיהוי שמות משופר
                 if (home_team[:5].lower() in api_home) or (away_team[:5].lower() in api_away):
                     bookmaker = game['bookmakers'][0] 
                     h2h_market = next((m for m in bookmaker['markets'] if m['key'] == 'h2h'), None)
@@ -168,7 +172,6 @@ def get_game_deep_data(game_id, home_id, away_id, home_team="", away_team=""):
     data = {"odds": {"1": "לא זמין", "X": "לא זמין", "2": "לא זמין", "over_2_5": "-", "under_2_5": "-"},
             "h2h_matches": [], "h2h_summary": {}, "home_stats": {}, "away_stats": {}, "missing_home": [], "missing_away": []}
     
-    # הבאת יחסים
     try:
         res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/odds/1/all", headers=HEADERS, timeout=5).json()
         if res.get("markets"):
@@ -188,7 +191,6 @@ def get_game_deep_data(game_id, home_id, away_id, home_team="", away_team=""):
     data["home_stats"] = get_team_stats(home_id)
     data["away_stats"] = get_team_stats(away_id)
     
-    # החזרת הפצועים
     missing = get_missing_players(game_id)
     data["missing_home"] = missing["home"]
     data["missing_away"] = missing["away"]
