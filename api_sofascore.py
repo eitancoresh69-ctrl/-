@@ -15,7 +15,7 @@ TARGET_LEAGUES = [
     'UEFA Champions League', 'NBA', 'Super League', 'CBA', 
     'Ligat HaAl', 'LaLiga', 'Copa del Rey', 'Supercopa',
     'Premier League', 'FA Cup', 'EFL Cup', 'Ligue 1',
-    'Serie A', 'Bundesliga', 'MLS', 'Euroleague'
+    'Serie A', 'Bundesliga', 'MLS', 'Euroleague', 'MLS Next Pro'
 ]
 
 def get_israel_time(utc_timestamp):
@@ -69,8 +69,10 @@ def get_team_stats(team_id, include_home_away=False):
         if res.status_code == 200:
             events = res.json().get("events", [])[:15]
             for e in events:
-                if e.get("status", {}).get("type") != "finished": continue
-                h_score, a_score = e.get("homeScore", {}).get("current", 0), e.get("awayScore", {}).get("current", 0)
+                h_score = e.get("homeScore", {}).get("current")
+                a_score = e.get("awayScore", {}).get("current")
+                if h_score is None or a_score is None: continue # מוודא שהמשחק אכן הסתיים ויש תוצאה
+                
                 is_h = e.get("homeTeam", {}).get("id") == team_id
                 
                 stats["goals_scored"] += h_score if is_h else a_score
@@ -98,8 +100,10 @@ def get_h2h_data(game_id, home_id, away_id):
         res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/h2h/events", headers=HEADERS, timeout=10)
         if res.status_code == 200:
             for e in res.json().get("events", []):
-                if e.get("status", {}).get("type") != "finished": continue
-                h_score, a_score = e.get("homeScore", {}).get("current"), e.get("awayScore", {}).get("current")
+                h_score = e.get("homeScore", {}).get("current")
+                a_score = e.get("awayScore", {}).get("current")
+                
+                # התיקון: במקום לבדוק סטטוס, פשוט בודקים אם יש תוצאות אמיתיות
                 if h_score is None or a_score is None: continue
                 
                 h2h_data["matches"].append({
@@ -130,11 +134,11 @@ def get_odds_from_the_odds_api(home_team, away_team):
         
         if res.status_code == 200:
             for game in res.json():
-                # אלגוריתם חכם יותר לחיפוש שמות קבוצות
                 api_home = game['home_team'].lower()
                 api_away = game['away_team'].lower()
                 
-                if (home_team[:4].lower() in api_home) or (away_team[:4].lower() in api_away):
+                # אלגוריתם זיהוי שמות משופר
+                if (home_team[:5].lower() in api_home) or (away_team[:5].lower() in api_away):
                     bookmaker = game['bookmakers'][0] 
                     h2h_market = next((m for m in bookmaker['markets'] if m['key'] == 'h2h'), None)
                     if h2h_market:
@@ -145,6 +149,19 @@ def get_odds_from_the_odds_api(home_team, away_team):
                     break
     except: pass
     return odds_data
+
+def get_missing_players(game_id):
+    missing = {"home": [], "away": []}
+    try:
+        res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/lineups", headers=HEADERS, timeout=8).json()
+        home_missing = [f"{p.get('player', {}).get('name', '')}" for p in res.get("home", {}).get("missingPlayers", [])]
+        away_missing = [f"{p.get('player', {}).get('name', '')}" for p in res.get("away", {}).get("missingPlayers", [])]
+        missing["home"] = home_missing if home_missing else ["סגל מלא"]
+        missing["away"] = away_missing if away_missing else ["סגל מלא"]
+    except:
+        missing["home"] = ["נתונים לא זמינים"]
+        missing["away"] = ["נתונים לא זמינים"]
+    return missing
 
 @st.cache_data(ttl=1800)
 def get_game_deep_data(game_id, home_id, away_id, home_team="", away_team=""):
@@ -160,7 +177,6 @@ def get_game_deep_data(game_id, home_id, away_id, home_team="", away_team=""):
                     for choice in market.get("choices", []): data["odds"][choice.get("name")] = choice.get("fractionalValue", "לא זמין")
     except: pass
     
-    # הפעלת הגיבוי רק אם אין נתונים
     if data["odds"]["1"] == "לא זמין":
         fallback = get_odds_from_the_odds_api(home_team, away_team)
         if fallback["1"] != "לא זמין": data["odds"] = fallback
@@ -171,5 +187,10 @@ def get_game_deep_data(game_id, home_id, away_id, home_team="", away_team=""):
     
     data["home_stats"] = get_team_stats(home_id)
     data["away_stats"] = get_team_stats(away_id)
+    
+    # החזרת הפצועים
+    missing = get_missing_players(game_id)
+    data["missing_home"] = missing["home"]
+    data["missing_away"] = missing["away"]
     
     return data
