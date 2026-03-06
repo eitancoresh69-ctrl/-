@@ -2,3 +2,4 @@ streamlit
 google-generativeai
 pandas
 requests
+deep-translator
