@@ -2,13 +2,11 @@ import streamlit as st
 import api_sofascore as api
 import ai_analyzer as ai
 
-# הגדרת הדף
 st.set_page_config(page_title="SportIQ ULTRA", layout="wide", initial_sidebar_state="expanded")
 
 if 'ai_results' not in st.session_state:
     st.session_state.ai_results = {}
 
-# --- CSS ---
 st.markdown("""
     <style>
         .stApp, [data-testid="stSidebar"] { direction: rtl !important; font-family: 'Heebo', sans-serif; }
@@ -32,7 +30,6 @@ st.markdown("""
 
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 
-# --- פונקציות עזר ויזואליות ---
 def render_form_badges(form_data):
     if not form_data: return "<span style='color:gray;'>אין נתונים</span>"
     html = "<div style='display:flex; gap: 5px; direction:ltr;'>"
@@ -42,7 +39,6 @@ def render_form_badges(form_data):
     return html
 
 def parse_odds_to_decimal(odd_str):
-    """ממיר יחסי זכייה (שבר או עשרוני) למספר עשרוני נקי לצורך חישוב הסתברות"""
     try:
         if '/' in str(odd_str):
             n, d = str(odd_str).split('/')
@@ -51,7 +47,6 @@ def parse_odds_to_decimal(odd_str):
     except:
         return 0
 
-# --- סרגל צד ---
 with st.sidebar:
     st.markdown("<h1 style='color:#00f0ff;'>⚡ SportIQ ULTRA</h1>", unsafe_allow_html=True)
     st.divider()
@@ -73,20 +68,17 @@ with st.sidebar:
     selected_game_str = st.radio("בחר משחק:", list(game_options.keys()), label_visibility="collapsed")
     selected_game = game_options[selected_game_str]
 
-# --- מסך מרכזי ---
 st.markdown(f"<h2>{selected_game['home']} <span style='color:#00f0ff'>VS</span> {selected_game['away']}</h2>", unsafe_allow_html=True)
-st.caption(f"ליגה: {selected_game['league']} | שעה: {selected_game['time']} | תאריך: {selected_date}")
+st.caption(f"ליגה: {selected_game['league']} | שעה (שעון ישראל): {selected_game['time']} | תאריך: {selected_date}")
 
 with st.spinner("מושך נתוני עומק..."):
     deep_data = api.get_game_deep_data(selected_game['id'], selected_game['home_id'], selected_game['away_id'])
 
-# הגדרת העמודות שגרמו לשגיאה (עכשיו הן קיימות!)
 col_data, col_ai = st.columns([1.3, 1.2], gap="large")
 
 with col_data:
     st.markdown("### 📊 לוח נתונים (Live)")
     
-    # חישוב מדד העוצמה (Probability Bar)
     h_odd = parse_odds_to_decimal(deep_data['odds'].get('1', '0'))
     d_odd = parse_odds_to_decimal(deep_data['odds'].get('X', '0'))
     a_odd = parse_odds_to_decimal(deep_data['odds'].get('2', '0'))
@@ -101,21 +93,15 @@ with col_data:
         h_norm = (h_prob / total_prob) * 100
         d_norm = (d_prob / total_prob) * 100
         a_norm = (a_prob / total_prob) * 100
-        
-        if h_norm > a_norm and h_norm > d_norm:
-            fav_text = f"פייבוריטית: {selected_game['home']}"
-        elif a_norm > h_norm and a_norm > d_norm:
-            fav_text = f"פייבוריטית: {selected_game['away']}"
-        else:
-            fav_text = "משחק שקול"
+        fav_text = f"פייבוריטית: {selected_game['home']}" if h_norm > a_norm and h_norm > d_norm else (f"פייבוריטית: {selected_game['away']}" if a_norm > h_norm and a_norm > d_norm else "משחק שקול")
             
         prob_html = f"""
         <div style='margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;'>
             <div style='font-size:0.75rem; color:#00f0ff; margin-bottom:5px;'>📊 מדד עוצמה ({fav_text})</div>
             <div style='display:flex; width:100%; height:8px; border-radius:4px; overflow:hidden;'>
-                <div style='width:{h_norm}%; background-color:#00ff88;' title='בית: {int(h_norm)}%'></div>
-                <div style='width:{d_norm}%; background-color:#ffd94a;' title='תיקו: {int(d_norm)}%'></div>
-                <div style='width:{a_norm}%; background-color:#ff3b5c;' title='חוץ: {int(a_norm)}%'></div>
+                <div style='width:{h_norm}%; background-color:#00ff88;'></div>
+                <div style='width:{d_norm}%; background-color:#ffd94a;'></div>
+                <div style='width:{a_norm}%; background-color:#ff3b5c;'></div>
             </div>
             <div style='display:flex; justify-content:space-between; font-size:0.65rem; color:gray; margin-top:4px;'>
                 <span>בית ({int(h_norm)}%)</span>
@@ -138,15 +124,17 @@ with col_data:
         </div>
         
         <div class='data-box'>
-            <h4>כושר נוכחי (5 משחקים אחרונים)</h4>
+            <h4>כושר נוכחי ומאזן שערים (5 משחקים אחרונים)</h4>
             <div style='display:flex; justify-content:space-between; margin-bottom:12px; background:rgba(0,0,0,0.2); padding:10px; border-radius:6px;'>
                 <div style='text-align:right;'>
                     <div style='font-size:0.75rem; color:gray; margin-bottom:4px;'>{selected_game['home']} (כללי)</div>
                     {render_form_badges(deep_data['home_form'])}
+                    <div style='font-size:0.7rem; color:#00f0ff; margin-top:6px;'>⚽ זכות: {deep_data['home_goals'][0]} | 🥅 חובה: {deep_data['home_goals'][1]}</div>
                 </div>
                 <div style='text-align:left;'>
                     <div style='font-size:0.75rem; color:gray; margin-bottom:4px;'>{selected_game['away']} (כללי)</div>
                     {render_form_badges(deep_data['away_form'])}
+                    <div style='font-size:0.7rem; color:#00f0ff; margin-top:6px;'>⚽ זכות: {deep_data['away_goals'][0]} | 🥅 חובה: {deep_data['away_goals'][1]}</div>
                 </div>
             </div>
             <div style='display:flex; justify-content:space-between; padding:0 10px;'>
@@ -182,7 +170,7 @@ with col_data:
     """, unsafe_allow_html=True)
 
 with col_ai:
-    st.markdown("### 🧠 מנוע AI (Gemini)")
+    st.markdown("### 🧠 מנוע AI (Gemini 1.5 Flash)")
     game_id_str = str(selected_game['id'])
     
     if game_id_str in st.session_state.ai_results:
@@ -194,7 +182,7 @@ with col_ai:
     else:
         st.info("ה-AI ממתין לפקודה לניתוח הנתונים המלאים.")
         if st.button("הפעל ניתוח AI עמוק ⚡"):
-            with st.spinner("מעבד היסטוריה, כושר, ופצועים..."):
+            with st.spinner("מעבד היסטוריה, שערי זכות/חובה, ופצועים..."):
                 result = ai.analyze_match(sport_choice, selected_game, deep_data, GEMINI_API_KEY)
                 st.session_state.ai_results[game_id_str] = result
                 st.rerun()
