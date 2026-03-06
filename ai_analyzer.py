@@ -1,6 +1,5 @@
 import os
 
-# ניסיון טעינת ספריות אופציונליות
 try:
     import google.generativeai as genai
 except ImportError:
@@ -45,15 +44,16 @@ H2H: {h2h_stats}
 """
 
     try:
-        if ai_provider == "Groq (Llama 3 - מומלץ חינם)":
+        if "Groq" in ai_provider:
             client = Groq(api_key=api_key)
             response = client.chat.completions.create(
-                model="llama3-70b-8192",
+                # עדכון השם של המודל למודל הפעיל החדש של Groq
+                model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}]
             )
             return response.choices[0].message.content
             
-        elif ai_provider == "ChatGPT (OpenAI)":
+        elif "ChatGPT" in ai_provider:
             client = OpenAI(api_key=api_key)
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -63,7 +63,7 @@ H2H: {h2h_stats}
             
         else: # Gemini Fallback
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-pro') # חזרה למודל היציב לגרסאות ישנות
+            model = genai.GenerativeModel('gemini-pro') 
             response = model.generate_content(prompt, stream=False)
             return response.text
             
