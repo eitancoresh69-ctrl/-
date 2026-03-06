@@ -8,7 +8,8 @@ def format_form_string(form_list):
 def analyze_match(sport, game_info, deep_data, GEMINI_API_KEY):
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-pro')
+        # תיקון: שימוש במודל החדש והנתמך של גוגל
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         h2h_text = ""
         if deep_data.get('h2h_matches'):
