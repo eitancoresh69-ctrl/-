@@ -19,7 +19,7 @@ st.markdown("""
 
 # --- הגדרת ה-AI (Gemini) ---
 # עליך להוציא מפתח API חינמי מ: https://aistudio.google.com/
-GEMINI_API_KEY = "AIzaSyAxVxrUdjzVmdyGrTsCe6zkYIuAE1RG0Wc"
+GEMINI_API_KEY = "הכנס_כאן_את_מפתח_ה_API_שלך"
 genai.configure(api_key=GEMINI_API_KEY)
 # שימוש במודל מתקדם של Gemini לטקסט
 model = genai.GenerativeModel('gemini-1.5-pro') 
