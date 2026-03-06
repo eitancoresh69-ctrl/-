@@ -3,7 +3,8 @@ import streamlit as st
 
 def analyze_match(sport, game_info, deep_data, api_key):
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-pro')
+    # שימוש במודל Flash המהיר והיציב שמונע את שגיאת ה-404
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
     אתה אנליסט ספורט ומומחה באיתור Value Bets. נתח את המשחק הבא:
@@ -12,7 +13,7 @@ def analyze_match(sport, game_info, deep_data, api_key):
     יחסים (Odds): {deep_data['odds']}
     היסטוריית H2H: {deep_data['h2h']}
     פצועים/חסרים: {deep_data['missing_players']}
-    סטטיסטיקות (אם קיימות): {deep_data['stats']}
+    סטטיסטיקות: {deep_data['stats']}
     
     אנא ספק בעברית:
     1. ניתוח מצב הקבוצות (הפתעות אפשריות, השפעת הפצועים).
