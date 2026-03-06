@@ -76,6 +76,10 @@ def get_team_stats(team_id, include_home_away=False):
         if res.status_code == 200:
             events = res.json().get("events", [])[:15]
             for e in events:
+                # סינון משחקים שעוד לא הסתיימו
+                if e.get("status", {}).get("type") != "finished":
+                    continue
+                    
                 h_score = e.get("homeScore", {}).get("current", 0)
                 a_score = e.get("awayScore", {}).get("current", 0)
                 is_h = e.get("homeTeam", {}).get("id") == team_id
@@ -121,12 +125,22 @@ def get_h2h_data(game_id, home_id, away_id):
     try:
         res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/h2h/events", headers=HEADERS, timeout=10)
         if res.status_code == 200:
-            events = res.json().get("events", [])[:10]
+            events = res.json().get("events", [])
             for e in events:
+                # תיקון קריטי: דילוג על משחקים שטרם שוחקו
+                if e.get("status", {}).get("type") != "finished":
+                    continue
+                    
                 h_team = e.get("homeTeam", {}).get("name", "")
                 a_team = e.get("awayTeam", {}).get("name", "")
-                h_score = e.get("homeScore", {}).get("current", 0)
-                a_score = e.get("awayScore", {}).get("current", 0)
+                
+                # חילוץ בטוח של התוצאות
+                h_score = e.get("homeScore", {}).get("current")
+                a_score = e.get("awayScore", {}).get("current")
+                
+                if h_score is None or a_score is None:
+                    continue
+                    
                 date_str = get_israel_time(e.get("startTimestamp", 0)).strftime("%d/%m/%Y")
                 
                 h2h_data["matches"].append({
@@ -141,6 +155,10 @@ def get_h2h_data(game_id, home_id, away_id):
                 if h_score > a_score: h2h_data["head_to_head"]["home_wins"] += 1
                 elif a_score > h_score: h2h_data["head_to_head"]["away_wins"] += 1
                 else: h2h_data["head_to_head"]["draws"] += 1
+                
+                # הגבלה ל-10 המפגשים האחרונים שהסתיימו
+                if len(h2h_data["matches"]) >= 10:
+                    break
     except Exception:
         pass
     return h2h_data
