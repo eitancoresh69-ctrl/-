@@ -16,7 +16,6 @@ TARGET_LEAGUES = [
 
 @st.cache_data(ttl=1800)
 def fetch_games_for_dates(sport="soccer", days=5):
-    """מושך משחקים ומסדר אותם לפי תאריכים"""
     api_sport = "football" if sport == "כדורגל ⚽" else "basketball"
     today = datetime.now()
     games_by_date = {}
@@ -41,27 +40,23 @@ def fetch_games_for_dates(sport="soccer", days=5):
                         })
         except: pass
     
-    # מנקה תאריכים שאין בהם משחקים
     return {k: v for k, v in games_by_date.items() if v}
 
 @st.cache_data(ttl=1800)
 def get_game_deep_data(game_id, home_name, away_name):
-    """מושך סטטיסטיקות עומק, H2H, פצועים ויחסים"""
     data = {
         "odds": {"1": "N/A", "X": "N/A", "2": "N/A"},
         "h2h": "אין מספיק נתונים היסטוריים.",
         "missing_players": "אין מידע זמין כרגע על חיסורים.",
-        "stats": "ממתין לנתוני משחק..."
+        "stats": "המשחק טרם החל או שאין נתונים חיים זמינים (קרנות/כרטיסים מופיעים רק בזמן אמת)."
     }
     
-    # משיכת Odds
     try:
         res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/odds/1/all", headers=HEADERS).json()
         choices = res.get("markets", [])[0].get("choices", [])
         data["odds"] = {c["name"]: c.get("fractionalValue") for c in choices}
     except: pass
 
-    # משיכת H2H (מפגשים קודמים)
     try:
         res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/h2h/events", headers=HEADERS).json()
         events = res.get("events", [])[:10]
@@ -72,7 +67,6 @@ def get_game_deep_data(game_id, home_name, away_name):
             data["h2h"] = f"ב-{len(events)} המפגשים האחרונים: {h_wins} נצחונות לבית, {a_wins} לחוץ, {draws} תיקו."
     except: pass
 
-    # משיכת פצועים/מושעים מתוך ההרכבים
     try:
         res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/lineups", headers=HEADERS).json()
         missing = []
@@ -83,17 +77,18 @@ def get_game_deep_data(game_id, home_name, away_name):
             data["missing_players"] = " | ".join(missing)
     except: pass
 
-    # סטטיסטיקות כלליות (אם המשחק התחיל או הסתיים)
+    # נסיון למשוך נתונים חיים (במידה והמשחק התחיל)
     try:
-        res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/statistics", headers=HEADERS).json()
-        stats_list = res.get("statistics", [])[0].get("groups", [])
-        extracted_stats = []
-        for group in stats_list:
-            for item in group.get("statisticsItems", []):
-                if item["name"] in ["Corner kicks", "Red cards", "Yellow cards"]:
-                    extracted_stats.append(f"{item['name']}: {item['home']} - {item['away']}")
-        if extracted_stats:
-            data["stats"] = " | ".join(extracted_stats)
+        res = requests.get(f"https://api.sofascore.com/api/v1/event/{game_id}/statistics", headers=HEADERS)
+        if res.status_code == 200:
+            stats_list = res.json().get("statistics", [])[0].get("groups", [])
+            extracted_stats = []
+            for group in stats_list:
+                for item in group.get("statisticsItems", []):
+                    if item["name"] in ["Corner kicks", "Red cards", "Yellow cards", "Ball possession"]:
+                        extracted_stats.append(f"{item['name']}: {item['home']} - {item['away']}")
+            if extracted_stats:
+                data["stats"] = " | ".join(extracted_stats)
     except: pass
 
     return data
