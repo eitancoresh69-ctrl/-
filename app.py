@@ -1,6 +1,6 @@
 import streamlit as st
-import api_sofascore_improved as api
-import ai_analyzer_improved as ai
+import api_sofascore as api
+import ai_analyzer as ai
 from datetime import datetime, timedelta
 import pandas as pd
 
