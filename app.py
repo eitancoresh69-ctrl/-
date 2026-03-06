@@ -4,7 +4,7 @@ import requests
 from datetime import datetime, timedelta
 import pandas as pd
 
-# הגדרת הדף (חייב להיות הראשון)
+# הגדרת הדף
 st.set_page_config(page_title="SportIQ ULTRA", layout="wide")
 
 # הזרקת CSS לימין-לשמאל
@@ -17,31 +17,30 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# משיכת מפתחות אבטחה מ-Streamlit Secrets
+# משיכת מפתח אבטחה של AI (אין צורך יותר ב-RapidAPI!)
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-RAPIDAPI_KEY = st.secrets["RAPIDAPI_KEY"]
-
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-pro') 
 
-# הגדרות APIs
+# הגדרות ליגות למעקב
 TARGET_LEAGUES = [
     'Premier League', 'LaLiga', 'Ligue 1', 'Serie A',
     'Ligat HaAl', 'State Cup', 'Toto Cup',
     'NBA', 'Super League', 'National League'
 ]
 
+# כותרות התחזות לדפדפן כדי ש-SofaScore לא יחסמו אותנו
 SOFASCORE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Origin": "https://www.sofascore.com",
     "Referer": "https://www.sofascore.com/"
 }
 
-# --- פונקציות משיכת נתונים (עם Caching לחסכון בבקשות API) ---
+# --- פונקציות משיכת נתונים ישירות מ-SofaScore ---
 
-@st.cache_data(ttl=1800) # שומר נתונים לחצי שעה
+@st.cache_data(ttl=1800) # שומר בזיכרון לחצי שעה כדי לא להיחסם
 def get_sofascore_odds(game_id):
-    """מושך יחסי זכייה ישירות מ-SofaScore"""
+    """מושך יחסי זכייה מ-SofaScore"""
     url = f"https://api.sofascore.com/api/v1/event/{game_id}/odds/1/all"
     try:
         res = requests.get(url, headers=SOFASCORE_HEADERS, timeout=5)
@@ -54,33 +53,26 @@ def get_sofascore_odds(game_id):
                 for choice in choices:
                     odds[choice["name"]] = choice.get("fractionalValue", choice.get("initialFractionalValue", "N/A"))
                 return odds
-    except Exception as e:
-        print(f"Error fetching odds: {e}")
+    except:
+        pass
     return {"1": "חסר", "X": "חסר", "2": "חסר"}
 
-@st.cache_data(ttl=3600) # שומר נתונים לשעה
+@st.cache_data(ttl=3600) # שומר לשעה
 def fetch_upcoming_games(sport, days=5):
-    """מושך משחקים מ-SportAPI7 ומשלב יחסים מ-SofaScore"""
+    """מושך משחקים מהדלת האחורית של SofaScore"""
     api_sport = "football" if sport == "כדורגל ⚽" else "basketball"
     games = []
     today = datetime.now()
     
-    headers = {
-        "x-rapidapi-host": "sportapi7.p.rapidapi.com",
-        "x-rapidapi-key": RAPIDAPI_KEY
-    }
-
-    # סריקת ימים
     for i in range(days):
         target_date = (today + timedelta(days=i)).strftime("%Y-%m-%d")
-        url = f"https://sportapi7.p.rapidapi.com/api/v1/sport/{api_sport}/scheduled-events/{target_date}"
+        url = f"https://api.sofascore.com/api/v1/sport/{api_sport}/scheduled-events/{target_date}"
         
         try:
-            res = requests.get(url, headers=headers, timeout=10)
+            res = requests.get(url, headers=SOFASCORE_HEADERS, timeout=10)
             if res.status_code == 200:
                 events = res.json().get("events", [])
                 
-                # סינון לפי ליגות המטרה שלנו
                 for event in events:
                     league_name = event.get("tournament", {}).get("name", "")
                     if any(target in league_name for target in TARGET_LEAGUES):
@@ -88,7 +80,6 @@ def fetch_upcoming_games(sport, days=5):
                         home_team = event.get("homeTeam", {}).get("name", "Unknown")
                         away_team = event.get("awayTeam", {}).get("name", "Unknown")
                         
-                        # משיכת Odds מ-SofaScore
                         odds = get_sofascore_odds(game_id)
                         
                         games.append({
@@ -102,18 +93,49 @@ def fetch_upcoming_games(sport, days=5):
                             "odds_a": odds.get("2", "חסר")
                         })
         except Exception as e:
-            st.error(f"שגיאה במשיכת נתונים לתאריך {target_date}: {e}")
+            print(f"Error on {target_date}: {e}")
             
     return games
 
 @st.cache_data(ttl=3600)
-def get_deep_stats(game_id):
-    """תשתית למשיכת סטטיסטיקות עומק ו-H2H מ-SofaScore"""
-    # כרגע נשאיר מוקאפ חכם, בשלב הבא נחבר גם את זה ל-API הסטטיסטיקות
+def get_deep_stats(game_id, home_team, away_team):
+    """מושך נתוני H2H (ראש בראש) היסטוריים מ-SofaScore"""
+    url = f"https://api.sofascore.com/api/v1/event/{game_id}/h2h/events"
+    h2h_summary = "אין מספיק נתונים היסטוריים."
+    
+    try:
+        res = requests.get(url, headers=SOFASCORE_HEADERS, timeout=5)
+        if res.status_code == 200:
+            events = res.json().get("events", [])
+            if events:
+                home_wins = 0
+                away_wins = 0
+                draws = 0
+                
+                # מנתח את 10 המפגשים האחרונים ביניהן
+                for past_game in events[:10]:
+                    winner_code = past_game.get("winnerCode")
+                    # SofaScore winnerCode: 1 = הבית של המשחק ההוא ניצח, 2 = החוץ, 3 = תיקו
+                    # כדי לא להסתבך עם מי אירח אז, נסתכל על תוצאת הסיום
+                    home_score = past_game.get("homeScore", {}).get("current", 0)
+                    away_score = past_game.get("awayScore", {}).get("current", 0)
+                    past_home_name = past_game.get("homeTeam", {}).get("name", "")
+                    
+                    if home_score == away_score:
+                        draws += 1
+                    elif (home_score > away_score and past_home_name == home_team) or \
+                         (away_score > home_score and past_home_name != home_team):
+                        home_wins += 1
+                    else:
+                        away_wins += 1
+                        
+                h2h_summary = f"ב-{len(events[:10])} המפגשים האחרונים: {home_wins} ניצחונות ל{home_team}, {away_wins} ל{away_team}, ו-{draws} תוצאות תיקו."
+    except Exception as e:
+        print(f"Error fetching H2H: {e}")
+
     return {
-        "h2h": "מערכת אוספת נתונים היסטוריים...",
-        "missing_players": "ממתין לפרסום סגלים סופיים...",
-        "momentum": "מבוסס על 5 משחקים אחרונים."
+        "h2h": h2h_summary,
+        "missing_players": "נתוני פצועים דורשים סריקה מורכבת מ-Rotowire/SofaScore (יצורף בעתיד)",
     }
 
 # --- ממשק המשתמש (Streamlit UI) ---
@@ -122,12 +144,12 @@ st.markdown("מערכת ניתוח ספורט ואיתור Value Bets")
 
 sport_choice = st.radio("בחר ענף ספורט:", ["כדורגל ⚽", "כדורסל 🏀"], horizontal=True)
 
-st.subheader("📅 משחקים קרובים ב-5 הימים הבאים (מבוסס נתוני אמת)")
-with st.spinner("מושך נתוני לייב מ-RapidAPI ו-SofaScore... זה עשוי לקחת כמה שניות בפעם הראשונה."):
+st.subheader("📅 משחקים קרובים ב-5 הימים הבאים (ישירות מ-SofaScore)")
+with st.spinner("מושך נתוני לייב... (מתחזה לדפדפן כדי לא להיחסם)"):
     games = fetch_upcoming_games(sport_choice)
 
 if not games:
-    st.info("לא נמצאו משחקים בליגות המטרה בימים הקרובים, או שהמכסה של ה-API הסתיימה.")
+    st.info("לא נמצאו משחקים בליגות המטרה בימים הקרובים.")
 else:
     df = pd.DataFrame(games)
     game_options = {f"{g['date']} | {g['league']} | {g['home']} נגד {g['away']}": g for g in games}
@@ -140,7 +162,7 @@ else:
 
     with col2:
         st.write("### נתונים חיים (Live)")
-        stats = get_deep_stats(selected_game['id'])
+        stats = get_deep_stats(selected_game['id'], selected_game['home'], selected_game['away'])
         st.write(f"**היסטוריית H2H:** {stats['h2h']}")
         st.write(f"**חיסורים בסגל:** {stats['missing_players']}")
         
@@ -162,9 +184,10 @@ else:
                     משחק: {selected_game['home']} נגד {selected_game['away']}
                     ליגה: {selected_game['league']}
                     יחסים: בית ({selected_game['odds_h']}), תיקו ({selected_game.get('odds_d', 'אין')}), חוץ ({selected_game['odds_a']})
+                    סטטיסטיקה: {stats['h2h']}
                     
                     ספק ניתוח קצר בעברית הכולל:
-                    1. ניתוח יחסי הכוחות בין שתי הקבוצות הללו בדרך כלל.
+                    1. ניתוח יחסי הכוחות לאור נתוני ה-H2H.
                     2. האם היחסים המוצעים משקפים את המציאות ויש בהם ערך (Value).
                     3. המלצה חותכת מנומקת.
                     """
