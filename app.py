@@ -526,7 +526,7 @@ with tab2:
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("סה"כ משחקים", h2h_summary.get('total', 0))
+            st.metric('סה"כ משחקים', h2h_summary.get('total', 0))
         with col2:
             st.metric("ניצחונות בית", h2h_summary.get('home_wins', 0))
         with col3:
