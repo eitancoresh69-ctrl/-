@@ -11,16 +11,15 @@ HEADERS = {
     "Cache-Control": "no-cache"
 }
 
-# רשימת הליגות המעודכנת בדיוק לפי הבקשה שלך
 TARGET_LEAGUES = [
-    'UEFA Champions League',             # ליגת האלופות
-    'NBA',                               # NBA
-    'Super League', 'Ligat Winner',      # ליגת כדורסל בישראל (בסופא-סקור נקראת Super League)
-    'CBA',                               # ליגת הכדורסל של סין
-    'Ligat HaAl', 'Ligat Al',            # ליגת העל בישראל (כדורגל)
-    'LaLiga', 'Copa del Rey', 'Supercopa', # הליגה הספרדית כולל גביעים
-    'Premier League', 'FA Cup', 'EFL Cup', # הליגה האנגלית כולל גביעים
-    'Ligue 1', 'Coupe de France'         # הליגה הצרפתית
+    'UEFA Champions League',             
+    'NBA',                               
+    'Super League', 'Ligat Winner',      
+    'CBA',                               
+    'Ligat HaAl', 'Ligat Al',            
+    'LaLiga', 'Copa del Rey', 'Supercopa', 
+    'Premier League', 'FA Cup', 'EFL Cup', 
+    'Ligue 1', 'Coupe de France'         
 ]
 
 def get_israel_time(utc_timestamp):
@@ -47,7 +46,11 @@ def fetch_games_for_dates(sport="soccer", days=7):
             if res.status_code == 200:
                 for event in res.json().get("events", []):
                     league = event.get("tournament", {}).get("name", "")
-                    # בדיקה אם הליגה נמצאת ברשימה המצומצמת שלנו
+                    
+                    # חסימה ספציפית לליגת הכדורגל הסינית שמתנגשת עם ה"סופר ליג" של הכדורסל
+                    if sport == "כדורגל ⚽" and "Chinese Super League" in league:
+                        continue
+
                     if any(target in league for target in TARGET_LEAGUES):
                         israel_time = get_israel_time(event.get("startTimestamp", 0))
                         games_by_date[target_date].append({
