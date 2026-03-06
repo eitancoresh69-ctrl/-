@@ -13,7 +13,8 @@ def analyze_match(sport, game_info, deep_data, GEMINI_API_KEY):
     """
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # שינוי למודל היציב שעובד
+        model = genai.GenerativeModel('gemini-pro')
         
         # עיצוב נתוני H2H
         h2h_text = ""
