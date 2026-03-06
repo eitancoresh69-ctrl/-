@@ -290,20 +290,30 @@ with st.sidebar:
         st.warning("⚠️ אין משחקים בטווח התאריכים שנבחר")
         st.stop()
     
-    # בחירת משחק
-    game_options = {
-        f"🕐 {g['time']} | {g['home']} ⚔️ {g['away']} | {g['league'][:20]}": g 
-        for g in filtered_games
-    }
+    # בחירת משחק - עם טעינה טובה יותר
+    game_options = {}
+    for g in filtered_games:
+        time_str = g['time']
+        home = g['home']
+        away = g['away']
+        league = g['league'][:15]  # קצר יותר
+        key = f"🕐 {time_str}  |  {home} ⚔️  {away}  |  {league}"
+        game_options[key] = g
     
-    st.markdown("**בחר משחק לניתוח:**")
-    selected_game_str = st.selectbox(
-        "משחק:",
-        list(game_options.keys()),
-        label_visibility="collapsed",
-        index=0
-    )
-    selected_game = game_options[selected_game_str]
+    st.markdown("**🎯 בחר משחק לניתוח:**")
+    
+    if game_options:
+        selected_game_str = st.selectbox(
+            "משחק:",
+            list(game_options.keys()),
+            label_visibility="collapsed",
+            index=0,
+            format_func=lambda x: x  # טיפול טוב יותר בהצגה
+        )
+        selected_game = game_options[selected_game_str]
+    else:
+        st.error("❌ אין משחקים זמינים")
+        st.stop()
     
     st.divider()
     
@@ -498,21 +508,35 @@ with tab1:
     
     with col_home_inj:
         st.markdown(f"**{selected_game['home']}:**")
-        missing_home = deep_data['missing_home']
-        if isinstance(missing_home, list) and len(missing_home) > 0:
-            for player in missing_home:
-                st.markdown(f"• {player}")
+        missing_home = deep_data.get('missing_home', [])
+        
+        # בדוק אם זה קיים וזה לא ריק
+        if missing_home and isinstance(missing_home, list) and len(missing_home) > 0:
+            # סינן מחרוזות ריקות
+            players = [p for p in missing_home if p and p.strip()]
+            if players:
+                for player in players:
+                    if player != "סגל מלא":
+                        st.error(f"🚑 {player}")
+            else:
+                st.success("✅ סגל מלא")
         else:
-            st.info("✅ סגל מלא")
+            st.success("✅ סגל מלא")
     
     with col_away_inj:
         st.markdown(f"**{selected_game['away']}:**")
-        missing_away = deep_data['missing_away']
-        if isinstance(missing_away, list) and len(missing_away) > 0:
-            for player in missing_away:
-                st.markdown(f"• {player}")
+        missing_away = deep_data.get('missing_away', [])
+        
+        if missing_away and isinstance(missing_away, list) and len(missing_away) > 0:
+            players = [p for p in missing_away if p and p.strip()]
+            if players:
+                for player in players:
+                    if player != "סגל מלא":
+                        st.error(f"🚑 {player}")
+            else:
+                st.success("✅ סגל מלא")
         else:
-            st.info("✅ סגל מלא")
+            st.success("✅ סגל מלא")
 
 # TAB 2: H2H
 with tab2:
@@ -566,7 +590,7 @@ with tab2:
 
 # TAB 3: ניתוח AI
 with tab3:
-    st.markdown("#### 🧠 מנוע ניתוח AI (Gemini 1.5 Flash)")
+    st.markdown("#### 🧠 מנוע ניתוח AI (Google Gemini)")
     
     GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
     
